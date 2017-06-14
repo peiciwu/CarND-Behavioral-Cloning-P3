@@ -5,14 +5,14 @@ import numpy as np
 # Read driving data cvs file.
 lines = []
 with open('./data/driving_log.csv') as csvfile:
-    reader = cvs.reader(csvfile)
+    reader = csv.reader(csvfile)
     for line in reader:
         lines.append(line)
 
 # Read images and steer measurements.
 images = []
 measurements = []
-for line in lines:
+for line in lines[1:-1]:
     source_path = line[0]
     filename = source_path.split('/')[-1]
     current_path = './data/IMG/' + filename
@@ -59,17 +59,17 @@ model.add(Cropping2D(cropping=((70,25), (0,0))))
 
 # Add three convolutional layers with a 5x5 kerenl and a 2x2 stride. Output depth is 24, 36, and 48, respectively.
 #model.add(Convolutional2D(24,5,5, subsample=(2,2), border_mode='valid', W_regularizer=l2(0.001)))
-model.add(Convolutional2D(24,5,5, subsample=(2,2), border_mode='valid'), activation='relu'))
+model.add(Convolution2D(24,5,5, subsample=(2,2), border_mode='valid', activation='relu'))
 #model.add(ELU())
-model.add(Convolutional2D(36,5,5, subsample=(2,2), border_mode='valid'), activation='relu'))
+model.add(Convolution2D(36,5,5, subsample=(2,2), border_mode='valid', activation='relu'))
 #model.add(ELU())
-model.add(Convolutional2D(48,5,5, subsample=(2,2), border_mode='valid'), activation='relu'))
+model.add(Convolution2D(48,5,5, subsample=(2,2), border_mode='valid', activation='relu'))
 #model.add(ELU())
 
 # Add two convolutional layers with a 3x3 kerenl. Output depth are both 64.
-model.add(Convolutional2D(64,3,3, border_mode='valid'), activation='relu'))
+model.add(Convolution2D(64,3,3, border_mode='valid', activation='relu'))
 #model.add(ELU())
-model.add(Convolutional2D(64,3,3, border_mode='valid'), activation='relu'))
+model.add(Convolution2D(64,3,3, border_mode='valid', activation='relu'))
 #model.add(ELU())
 
 model.add(Flatten())
