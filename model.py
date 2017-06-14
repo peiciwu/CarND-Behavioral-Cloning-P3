@@ -17,7 +17,7 @@ def readDrivingLog(samples, dir_name):
             line[0] = dir_name + '/' + line[0] # Add dir_name to the file name
             samples.append(line)
 
-def generator(samples, batch_size=32):
+def generator(samples, batch_size=32, augment_image=0):
     num_samples = len(samples)
     while 1:
         shuffle(samples)
@@ -30,7 +30,13 @@ def generator(samples, batch_size=32):
             for batch_sample in batch_samples:
                 image = cv2.imread(batch_sample[0])
                 images.append(image)
-                steerings.append(float(batch_sample[3]))
+                steering = float(batch_sample[3])
+                steerings.append(steering)
+                if (augment_image):
+                    # Flip image
+                    image_flipped = cv2.flip(image, 1)
+                    images.append(image_flipped)
+                    steerings.append(-steering)
 
             X_train = np.array(images)
             y_train = np.array(steerings)
@@ -41,12 +47,12 @@ def fit_model(train_generator, validation_generator, num_train_samples, num_vali
     Use Nvidia model
     """
     model = Sequential()
-    ### Normalization
+    # Normalization
     model.add(Lambda(lambda x: x / 255.0 - 0.5, input_shape=(160,320,3)))
-    ### Image cropping layer. Crop 70 pixels from the top and 25 pixels from the bottom.
+    # Image cropping layer. Crop 70 pixels from the top and 25 pixels from the bottom.
     model.add(Cropping2D(cropping=((70,25), (0,0))))
 
-    ### Add three convolutional layers with a 5x5 kerenl and a 2x2 stride. Output depth is 24, 36, and 48, respectively.
+    # Add three convolutional layers with a 5x5 kerenl and a 2x2 stride. Output depth is 24, 36, and 48, respectively.
     #model.add(Convolutional2D(24,5,5, subsample=(2,2), border_mode='valid', W_regularizer=l2(0.001)))
     model.add(Convolution2D(24,5,5, subsample=(2,2), border_mode='valid', activation='relu'))
     #model.add(ELU())
@@ -55,7 +61,7 @@ def fit_model(train_generator, validation_generator, num_train_samples, num_vali
     model.add(Convolution2D(48,5,5, subsample=(2,2), border_mode='valid', activation='relu'))
     #model.add(ELU())
 
-    ### Add two convolutional layers with a 3x3 kerenl. Output depth are both 64.
+    # Add two convolutional layers with a 3x3 kerenl. Output depth are both 64.
     model.add(Convolution2D(64,3,3, border_mode='valid', activation='relu'))
     #model.add(ELU())
     model.add(Convolution2D(64,3,3, border_mode='valid', activation='relu'))
@@ -63,17 +69,17 @@ def fit_model(train_generator, validation_generator, num_train_samples, num_vali
 
     model.add(Flatten())
 
-    ### Fully connected layer. Output = 100
+    # Fully connected layer. Output = 100
     model.add(Dense(100))
     #model.add(Activation('relu'))
-    ### Fully connected layer. Output = 50
+    # Fully connected layer. Output = 50
     model.add(Dense(50))
     #model.add(Activation('relu'))
-    ### Fully connected layer. Output = 10
+    # Fully connected layer. Output = 10
     model.add(Dense(10))
     #model.add(Activation('relu'))
 
-    ### Final output layer
+    # Final output layer
     model.add(Dense(1))
 
     model.compile(loss='mse', optimizer='adam') # Mean sqaure error and adam optimizer.
@@ -88,7 +94,7 @@ def fit_model(train_generator, validation_generator, num_train_samples, num_vali
     
 ###########################
 # TODO.
-# - Data Augmentation: flip etc.
+# - Data Augmentation: flip etc. DONE flip.
 # - Using mulitple cameras.
 # - Collect my own data.
 ###########################
@@ -105,12 +111,12 @@ train_samples, validation_samples = train_test_split(samples, test_size=0.2)
 
 ### Use generator
 BATCH_SIZE = 32
-train_generator = generator(train_samples, batch_size=BATCH_SIZE)
+train_generator = generator(train_samples, batch_size=BATCH_SIZE, augment_image=1)
 validation_generator = generator(validation_samples, batch_size=BATCH_SIZE)
 
 ### Model building
 EPOCH = 5
-history_object = fit_model(train_generator, validation_generator, len(train_samples), len(validation_samples), EPOCH)
+history_object = fit_model(train_generator, validation_generator, len(train_samples)*2, len(validation_samples), EPOCH)
 
 ### Plot the training and validation loss for each epoch
 import matplotlib
