@@ -4,11 +4,14 @@ import numpy as np
 import sklearn
 from random import shuffle
 from keras.models import Sequential, Model
-from keras.layers import Flatten, Dense, Lambda, Activation
+from keras.layers import Flatten, Dense, Lambda, Activation, Dropout
 from keras.layers.convolutional import Convolution2D
 from keras.layers import Cropping2D
 from keras.optimizers import Adam
 from keras.layers.advanced_activations import ELU
+
+def flip_image(img):
+    return cv2.flip(img, 1)
 
 def readDrivingLog(samples, dir_name, delimiter):
     with open(dir_name+'/driving_log.csv') as csvfile:
@@ -18,9 +21,9 @@ def readDrivingLog(samples, dir_name, delimiter):
                 filename = line[i].split(delimiter)[-1]
                 line[i] = dir_name + '/IMG/' + filename # Add dir_name to the file name
             steering = float(line[3])
-            samples.append((line[0], steering)) # center image
-            samples.append((line[1], steering+0.25)) # left image
-            samples.append((line[2], steering-0.25)) # right image
+            samples.append((line[0], steering, 0)) # center image
+            samples.append((line[1], steering+0.25, 0)) # left image
+            samples.append((line[2], steering-0.25, 0)) # right image
 
 def generator(samples, batch_size):
     num_samples = len(samples)
@@ -33,15 +36,12 @@ def generator(samples, batch_size):
             images = []
             steerings = []
             for sample in batch_samples:
-                filepath, steering = sample
-                images.append(cv2.imread(filepath))
+                filepath, steering, flip = sample
+                img = cv2.imread(filepath)
+                if (flip):
+                    img = flip_image(img)
+                images.append(img)
                 steerings.append(steering)
-                """
-                # Flip image
-                image_flipped = cv2.flip(image, 1)
-                images.append(image_flipped)
-                steerings.append(-steering)
-                """
 
             X_train = np.array(images)
             y_train = np.array(steerings)
@@ -87,14 +87,17 @@ def fit_model(train_generator, validation_generator, num_train_samples, num_vali
     model.add(Dense(100))
     model.add(Activation('relu'))
     #model.add(ELU())
+    #model.add(Dropout(0.2))
     # Fully connected layer. Output = 50
     model.add(Dense(50))
     model.add(Activation('relu'))
     #model.add(ELU())
+    #model.add(Dropout(0.2))
     # Fully connected layer. Output = 10
     model.add(Dense(10))
     #model.add(ELU())
     model.add(Activation('relu'))
+    #model.add(Dropout(0.2))
 
     # Final output layer
     model.add(Dense(1))
@@ -112,8 +115,8 @@ def fit_model(train_generator, validation_generator, num_train_samples, num_vali
     
 ###########################
 # TODO.
-# - Data Augmentation: flip etc. DONE flip.
-# - Using mulitple cameras.
+# - Data Augmentation: flip etc. DONE.
+# - Using left/right cameras. DONE.
 # - Collect my own data.
 ###########################
 
@@ -122,20 +125,27 @@ def fit_model(train_generator, validation_generator, num_train_samples, num_vali
 #################################################################
 
 samples = []
-readDrivingLog(samples, dir_name='data', delimiter='/') # Read from data provided by the class
+#readDrivingLog(samples, dir_name='data', delimiter='/') # Read from data provided by the class
 #readDrivingLog(samples, dir_name='new_data', delimiter='\\') # Read my own data
+#readDrivingLog(samples, dir_name='my_data', delimiter='\\') # Read my own data, a.k.a v1.
+readDrivingLog(samples, dir_name='v2', delimiter='\\') # Read my own data
+
+size_samples = len(samples)
+for i in range(size_samples):
+    filepath, steering, _ = samples[i]
+    if steering > 0.5 or steering < -0.5:
+        samples.append((filepath, -steering, 1)) # flip image with larger steering angles
 
 from sklearn.model_selection import train_test_split
 train_samples, validation_samples = train_test_split(samples, test_size=0.2)
 
 ### Use generator
-BATCH_SIZE = 64
+BATCH_SIZE = 32
 train_generator = generator(train_samples, batch_size=BATCH_SIZE)
 validation_generator = generator(validation_samples, batch_size=BATCH_SIZE)
 
 ### Model building
-EPOCH = 10
-#history_object = fit_model(train_generator, validation_generator, len(train_samples)*3, len(validation_samples)*3, EPOCH)
+EPOCH = 15
 history_object = fit_model(train_generator, validation_generator, len(train_samples), len(validation_samples), EPOCH)
 
 ### Plot the training and validation loss for each epoch
